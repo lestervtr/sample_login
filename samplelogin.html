@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Auth0 Simple Integration</title>
+    <title>Auth0 Login Integration</title>
     <style>
       * {
         margin: 0;
@@ -12,7 +12,7 @@
       }
       body {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #ec4899 0%, #f97316 100%);
         min-height: 100vh;
         display: flex;
         align-items: center;
@@ -61,10 +61,19 @@
         background: #1118271a;
         color: #111827;
       }
+      .btn.login-choice:hover {
+        background: #667eea;
+        color: #fff;
+      }
       .btn.ghost {
         background: transparent;
         border: 1px dashed #cbd5e1;
         color: #334155;
+      }
+      .btn.ghost:hover {
+        background: #ef4444;
+        border-color: #ef4444;
+        color: #fff;
       }
       .loading {
         display: inline-block;
@@ -169,7 +178,7 @@
   </head>
   <body>
     <div class="container">
-      <div class="logo">🔐 Auth0 Demo</div>
+      <div class="logo">🔐 Manual V2 API Login</div>
 
       <div id="config-warning" class="config-warning" style="display: none">
         <strong>Warning:</strong> Please update <code>auth0Config</code> below
@@ -182,11 +191,21 @@
 
       <!-- ORIGINAL LOGIN (kept exactly, plus a new Code Flow logout button) -->
       <div id="login-section" style="display: block">
-        <p>Welcome! Please log in to continue.</p>
         <div class="row">
-          <button id="login-btn" class="btn" disabled>Log In</button>
-          <button id="login-code-btn" class="btn secondary" disabled>
-            Log In (Code Flow)
+          <!-- <button id="login-btn" class="btn" disabled>Log In</button> -->
+          <button
+            id="login-dashboard-btn"
+            class="btn secondary login-choice"
+            disabled
+          >
+            Login for Dashboard
+          </button>
+          <button
+            id="login-proposal-builder-btn"
+            class="btn secondary login-choice"
+            disabled
+          >
+            Login for Proposal Builder
           </button>
           <!-- NEW: logout on the login screen -->
           <button id="logout-code-btn" class="btn ghost" disabled>
@@ -340,8 +359,12 @@
       // DOM refs (original)
       const loginSection = document.getElementById("login-section");
       const userSection = document.getElementById("user-section");
+      // The original SPA login button is intentionally disabled in the UI.
       const loginBtn = document.getElementById("login-btn");
-      const loginCodeBtn = document.getElementById("login-code-btn");
+      const loginDashboardBtn = document.getElementById("login-dashboard-btn");
+      const loginProposalBuilderBtn = document.getElementById(
+        "login-proposal-builder-btn",
+      );
       const logoutBtn = document.getElementById("logout-btn");
       const userAvatar = document.getElementById("user-avatar");
       const userDetails = document.getElementById("user-details");
@@ -378,6 +401,11 @@
       // Hidden captured values for code flow
       let __auth_code = null;
       let __auth_state = null;
+      let __organization = "ntv360";
+      try {
+        __organization =
+          sessionStorage.getItem("code_flow_organization") || __organization;
+      } catch {}
 
       // ------------------ UI helpers ------------------
       let tokenVisible = true;
@@ -499,7 +527,7 @@
           redirectUri: redirectUri || undefined,
           codeVerifier: codeVerifier || undefined,
           audience,
-          organization: "ntv360",
+          organization: __organization,
         };
         Object.keys(body).forEach(
           (k) => body[k] === undefined && delete body[k],
@@ -692,16 +720,18 @@
         }
       }
 
-      async function loginWithCodeFlow() {
+      async function loginWithCodeFlow(organization, button) {
         try {
           if (!auth0Client) {
             alert("Auth0 not initialized. Refresh and check config.");
             return;
           }
-          loginCodeBtn.disabled = true;
-          loginCodeBtn.innerHTML = '<span class="loading"></span>Logging in…';
+          __organization = organization;
+          button.disabled = true;
+          button.innerHTML = '<span class="loading"></span>Logging in…';
           try {
             sessionStorage.setItem("code_only_mode", "1");
+            sessionStorage.setItem("code_flow_organization", organization);
           } catch {}
           await auth0Client.loginWithRedirect({
             authorizationParams: {
@@ -715,8 +745,11 @@
           });
         } catch (error) {
           console.error("Code Flow login error:", error);
-          loginCodeBtn.disabled = false;
-          loginCodeBtn.innerHTML = "Log In (Code Flow)";
+          button.disabled = false;
+          button.innerHTML =
+            organization === "ntv360"
+              ? "Log In Dashboard"
+              : "Log In Proposal Builder";
           alert("Login failed. See console for details.");
         }
       }
@@ -761,8 +794,12 @@
       }
 
       // Events
-      loginBtn.addEventListener("click", login);
-      loginCodeBtn.addEventListener("click", loginWithCodeFlow);
+      loginDashboardBtn.addEventListener("click", () =>
+        loginWithCodeFlow("ntv360", loginDashboardBtn),
+      );
+      loginProposalBuilderBtn.addEventListener("click", () =>
+        loginWithCodeFlow("proposal_builder", loginProposalBuilderBtn),
+      );
       logoutBtn.addEventListener("click", logout);
       logoutCodeBtn.addEventListener("click", () =>
         performLogout(logoutCodeBtn),
@@ -775,8 +812,8 @@
       async function initAuth0() {
         try {
           loadingDiv.style.display = "block";
-          loginBtn.disabled = true;
-          loginCodeBtn.disabled = true;
+          loginDashboardBtn.disabled = true;
+          loginProposalBuilderBtn.disabled = true;
           logoutCodeBtn.disabled = true;
           if (builderLogoutBtn) builderLogoutBtn.disabled = true;
 
@@ -865,8 +902,8 @@
         } finally {
           loadingDiv.style.display = "none";
           if (configWarningDiv.style.display === "none") {
-            loginBtn.disabled = false;
-            loginCodeBtn.disabled = false;
+            loginDashboardBtn.disabled = false;
+            loginProposalBuilderBtn.disabled = false;
             logoutCodeBtn.disabled = false;
             if (builderLogoutBtn) builderLogoutBtn.disabled = false;
           }
